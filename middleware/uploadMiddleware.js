@@ -5,6 +5,7 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 import { pipeline } from 'stream/promises';
 import { createWriteStream } from 'fs';
+import { ValidationError, DatabaseError } from '../utils/errors.js';
 
 // ✅ Ensure uploads folder exists
 const uploadDir = 'uploads/';
@@ -97,7 +98,9 @@ export const processFiles = async (req) => {
     }
   } catch (error) {
     console.error('❌ Error processing files:', error);
-    throw error;
+    throw new DatabaseError(`Failed to process uploaded files: ${error.message}`, {
+      error: error.message
+    });
   }
   
   req.files = files;
@@ -291,7 +294,9 @@ export const extremeOptimization = async (req, reply) => {
     return; // Continue to next handler
   } catch (err) {
     console.error('❌ Extreme optimization failed:', err);
-    throw err;
+    throw new DatabaseError(`Extreme optimization failed: ${err.message}`, {
+      error: err.message
+    });
   }
 };
 
@@ -381,7 +386,9 @@ export const ultraTinyOptimization = async (req, reply) => {
     return; // Continue to next handler
   } catch (err) {
     console.error('❌ Ultra tiny optimization failed:', err);
-    throw err;
+    throw new DatabaseError(`Ultra tiny optimization failed: ${err.message}`, {
+      error: err.message
+    });
   }
 };
 
@@ -462,7 +469,9 @@ export const smartSizeOptimization = (targetMaxKB = 10) => {
       return; // Continue to next handler
     } catch (err) {
       console.error('❌ Smart optimization failed:', err);
-      throw err;
+      throw new DatabaseError(`Smart optimization failed: ${err.message}`, {
+        error: err.message
+      });
     }
   };
 };
@@ -521,9 +530,8 @@ export const testOptimization = async (req, reply) => {
     });
     
   } catch (error) {
-    reply.status(500).send({
-      error: 'Test failed',
-      message: error.message
+    throw new DatabaseError(`Test optimization failed: ${error.message}`, {
+      error: error.message
     });
   }
 };

@@ -1,4 +1,4 @@
-// productRoutes.js
+// routes/productRoutes.js
 import {
     getAllProducts,
     getProductById,
@@ -20,6 +20,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import sharp from 'sharp';
 import crypto from 'crypto';
+import { DatabaseError } from '../utils/errors.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -152,138 +153,112 @@ export default async function productRoutes(fastify, opts) {
     // ✅ CREATE PRODUCT - with Fastify multipart
     fastify.post('/', {
         preHandler: async (req, reply) => {
-            try {
-                console.log('\n🔵 ========== CREATE PRODUCT ==========');
-                
-                // ✅ Process files and extract fields from req.body
-                const { files, fields } = await processUploadedFiles(req);
-                
-                // ✅ Set files on req
-                req.files = files;
-                
-                // ✅ Rebuild req.body with extracted field values
-                req.body = { ...fields };
-                
-                console.log('📋 After extraction - req.body:', req.body);
-                console.log(`📁 Total files: ${req.files?.length || 0}`);
-                req.files?.forEach((f, i) => {
-                    console.log(`   File ${i + 1}: ${f.fieldname} -> ${f.filename}`);
-                });
-                
-                // ✅ Convert string values to proper types
-                if (req.body.basePrice) {
-                    req.body.basePrice = parseFloat(req.body.basePrice);
-                    console.log(`💰 basePrice: ${req.body.basePrice}`);
-                }
-                if (req.body.originalPrice) {
-                    req.body.originalPrice = parseFloat(req.body.originalPrice);
-                }
-                if (req.body.discountPercentage) {
-                    req.body.discountPercentage = parseFloat(req.body.discountPercentage);
-                }
-                if (req.body.stock) {
-                    req.body.stock = parseInt(req.body.stock);
-                } else if (req.body.stock === undefined || req.body.stock === null) {
-                    req.body.stock = 0;
-                }
-                if (req.body.rating) {
-                    req.body.rating = parseFloat(req.body.rating);
-                }
-                if (req.body.numberOfReviews) {
-                    req.body.numberOfReviews = parseInt(req.body.numberOfReviews);
-                }
-                if (req.body.displayOrder) {
-                    req.body.displayOrder = parseInt(req.body.displayOrder);
-                }
-                
-                // ✅ Convert boolean strings
-                ['hasOffer', 'featured'].forEach(key => {
-                    if (req.body[key] === 'true') req.body[key] = true;
-                    if (req.body[key] === 'false') req.body[key] = false;
-                });
-                
-                // ✅ Parse JSON fields
-                ['specifications', 'keyFeatures', 'metaKeywords', 'variants'].forEach(key => {
-                    if (req.body[key] && typeof req.body[key] === 'string') {
-                        try {
-                            req.body[key] = JSON.parse(req.body[key]);
-                        } catch (e) {
-                            console.log(`⚠️ Failed to parse ${key}:`, e.message);
-                        }
-                    }
-                });
-                
-                console.log('✅ FINAL req.body:', JSON.stringify(req.body, null, 2));
-                console.log(`📁 Files: ${req.files?.length || 0}`);
-                console.log('=====================================\n');
-                
-            } catch (error) {
-                console.error('❌ File upload error:', error);
-                return reply.status(500).send({
-                    success: false,
-                    message: 'File upload failed: ' + error.message
-                });
+            console.log('\n🔵 ========== CREATE PRODUCT ==========');
+            
+            // ✅ Process files and extract fields from req.body
+            const { files, fields } = await processUploadedFiles(req);
+            
+            // ✅ Set files on req
+            req.files = files;
+            
+            // ✅ Rebuild req.body with extracted field values
+            req.body = { ...fields };
+            
+            console.log('📋 After extraction - req.body:', req.body);
+            console.log(`📁 Total files: ${req.files?.length || 0}`);
+            req.files?.forEach((f, i) => {
+                console.log(`   File ${i + 1}: ${f.fieldname} -> ${f.filename}`);
+            });
+            
+            // ✅ Convert string values to proper types
+            if (req.body.basePrice) {
+                req.body.basePrice = parseFloat(req.body.basePrice);
+                console.log(`💰 basePrice: ${req.body.basePrice}`);
             }
+            if (req.body.originalPrice) {
+                req.body.originalPrice = parseFloat(req.body.originalPrice);
+            }
+            if (req.body.discountPercentage) {
+                req.body.discountPercentage = parseFloat(req.body.discountPercentage);
+            }
+            if (req.body.stock) {
+                req.body.stock = parseInt(req.body.stock);
+            } else if (req.body.stock === undefined || req.body.stock === null) {
+                req.body.stock = 0;
+            }
+            if (req.body.rating) {
+                req.body.rating = parseFloat(req.body.rating);
+            }
+            if (req.body.numberOfReviews) {
+                req.body.numberOfReviews = parseInt(req.body.numberOfReviews);
+            }
+            if (req.body.displayOrder) {
+                req.body.displayOrder = parseInt(req.body.displayOrder);
+            }
+            
+            // ✅ Convert boolean strings
+            ['hasOffer', 'featured'].forEach(key => {
+                if (req.body[key] === 'true') req.body[key] = true;
+                if (req.body[key] === 'false') req.body[key] = false;
+            });
+            
+            // ✅ Parse JSON fields
+            ['specifications', 'keyFeatures', 'metaKeywords', 'variants'].forEach(key => {
+                if (req.body[key] && typeof req.body[key] === 'string') {
+                    try {
+                        req.body[key] = JSON.parse(req.body[key]);
+                    } catch (e) {
+                        console.log(`⚠️ Failed to parse ${key}:`, e.message);
+                    }
+                }
+            });
+            
+            console.log('✅ FINAL req.body:', JSON.stringify(req.body, null, 2));
+            console.log(`📁 Files: ${req.files?.length || 0}`);
+            console.log('=====================================\n');
         }
     }, createProduct);
 
     // ✅ UPDATE PRODUCT - with Fastify multipart
     fastify.put('/:id', {
         preHandler: async (req, reply) => {
-            try {
-                console.log('\n🔵 ========== UPDATE PRODUCT ==========');
-                
-                const { files, fields } = await processUploadedFiles(req);
-                req.files = files;
-                req.body = { ...fields };
-                
-                console.log(`📁 Total files: ${req.files?.length || 0}`);
-                
-                if (req.body.basePrice) req.body.basePrice = parseFloat(req.body.basePrice);
-                if (req.body.originalPrice) req.body.originalPrice = parseFloat(req.body.originalPrice);
-                if (req.body.discountPercentage) req.body.discountPercentage = parseFloat(req.body.discountPercentage);
-                if (req.body.stock) req.body.stock = parseInt(req.body.stock);
-                
-                ['hasOffer', 'featured'].forEach(key => {
-                    if (req.body[key] === 'true') req.body[key] = true;
-                    if (req.body[key] === 'false') req.body[key] = false;
-                });
-                
-                ['specifications', 'keyFeatures', 'metaKeywords', 'variants', 'deletedMainImages', 'deletedVariantImages'].forEach(key => {
-                    if (req.body[key] && typeof req.body[key] === 'string') {
-                        try {
-                            req.body[key] = JSON.parse(req.body[key]);
-                        } catch (e) {}
-                    }
-                });
-                
-                console.log('✅ FINAL req.body:', JSON.stringify(req.body, null, 2));
-                console.log('=====================================\n');
-                
-            } catch (error) {
-                console.error('❌ File upload error:', error);
-                return reply.status(500).send({
-                    success: false,
-                    message: 'File upload failed: ' + error.message
-                });
-            }
+            console.log('\n🔵 ========== UPDATE PRODUCT ==========');
+            
+            const { files, fields } = await processUploadedFiles(req);
+            req.files = files;
+            req.body = { ...fields };
+            
+            console.log(`📁 Total files: ${req.files?.length || 0}`);
+            
+            if (req.body.basePrice) req.body.basePrice = parseFloat(req.body.basePrice);
+            if (req.body.originalPrice) req.body.originalPrice = parseFloat(req.body.originalPrice);
+            if (req.body.discountPercentage) req.body.discountPercentage = parseFloat(req.body.discountPercentage);
+            if (req.body.stock) req.body.stock = parseInt(req.body.stock);
+            
+            ['hasOffer', 'featured'].forEach(key => {
+                if (req.body[key] === 'true') req.body[key] = true;
+                if (req.body[key] === 'false') req.body[key] = false;
+            });
+            
+            ['specifications', 'keyFeatures', 'metaKeywords', 'variants', 'deletedMainImages', 'deletedVariantImages'].forEach(key => {
+                if (req.body[key] && typeof req.body[key] === 'string') {
+                    try {
+                        req.body[key] = JSON.parse(req.body[key]);
+                    } catch (e) {}
+                }
+            });
+            
+            console.log('✅ FINAL req.body:', JSON.stringify(req.body, null, 2));
+            console.log('=====================================\n');
         }
     }, updateProduct);
 
     // ✅ UPLOAD VARIANT IMAGES
     fastify.post('/:productId/variants/:variantIndex/images', {
         preHandler: async (req, reply) => {
-            try {
-                const { files, fields } = await processUploadedFiles(req);
-                req.files = files;
-                req.body = { ...fields };
-            } catch (error) {
-                console.error('❌ File upload error:', error);
-                return reply.status(500).send({
-                    success: false,
-                    message: 'File upload failed: ' + error.message
-                });
-            }
+            const { files, fields } = await processUploadedFiles(req);
+            req.files = files;
+            req.body = { ...fields };
         }
     }, uploadVariantImages);
 

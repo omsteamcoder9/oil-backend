@@ -1,5 +1,6 @@
-// appfolder/controller/userController.js
+// controllers/userController.js
 import User from '../models/userModel.js';
+import { NotFoundError } from '../utils/errors.js';
 
 /**
  * Get profile for current logged-in user
@@ -7,6 +8,10 @@ import User from '../models/userModel.js';
 export const getProfile = async (req, reply) => {
   const userId = req.user.id;
   const user = await User.findById(userId).select('-password');
-  if (!user) return reply.status(404).send({ message: 'User not found' });
+  
+  if (!user) {
+    throw new NotFoundError('User', { userId });
+  }
+  
   return reply.send(user);
 };

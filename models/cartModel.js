@@ -22,7 +22,7 @@ const cartItemSchema = new mongoose.Schema({
   
   // ✅ Store which variant was selected (if any)
   variantId: {
-    type: String, // Store variant._id
+    type: String,
     default: null
   },
   
@@ -30,6 +30,24 @@ const cartItemSchema = new mongoose.Schema({
   variantName: {
     type: String,
     default: ''
+  },
+  
+  // ✅ Store variant images for display in cart
+  variantImages: {
+    type: [String],
+    default: []
+  },
+  
+  // ✅ ADDED: Store weight for display in cart
+  weight: {
+    type: Number,
+    default: 0
+  },
+  
+  // ✅ ADDED: Store weight unit
+  weightUnit: {
+    type: String,
+    default: 'gram'
   },
   
   // ✅ For backward compatibility with colors

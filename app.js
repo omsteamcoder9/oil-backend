@@ -3,8 +3,9 @@ import mongoose from 'mongoose';
 import cors from '@fastify/cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import fastifyMultipart from '@fastify/multipart'; // ✅ ADDED
+import fastifyMultipart from '@fastify/multipart';
 
+// ============ IMPORT ROUTES ============
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/user.js';
 import adminRoutes from './routes/admin.js';
@@ -19,6 +20,9 @@ import contactRoutes from './routes/contactRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import settingsRoutes from './routes/settingsRoutes.js';
 import blogRoutes from './routes/blogRoutes.js';
+
+// ============ IMPORT ERROR HANDLER ============
+import { errorHandler } from './middleware/errorHandler.js';
 
 // -------------------------------
 // 🔧 Load .env correctly
@@ -36,7 +40,11 @@ const app = fastify({
   logger: true
 });
 
-// CORS Configuration
+// ============ ✅ REGISTER GLOBAL ERROR HANDLER ============
+// MUST be registered BEFORE routes!
+app.setErrorHandler(errorHandler);
+
+// ============ CORS Configuration ============
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(",").map(o => o.trim())
   : [
@@ -73,24 +81,24 @@ await app.register(cors, {
   maxAge: 86400
 });
 
-// ✅ REGISTER MULTIPART PLUGIN - BEFORE ROUTES
+// ============ REGISTER MULTIPART PLUGIN ============
 await app.register(fastifyMultipart, {
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max file size
   },
-  attachFieldsToBody: true, // Makes form fields available in req.body
+  attachFieldsToBody: true,
 });
 
 // Fastify has built-in JSON parsing
 await app.register(import('@fastify/formbody'));
 
-// Static files
+// ============ Static files ============
 await app.register(import('@fastify/static'), {
   root: path.join(__dirname, 'uploads'),
   prefix: '/uploads',
 });
 
-// Routes
+// ============ Routes ============
 await app.register(authRoutes, { prefix: '/api/auth' });
 await app.register(userRoutes, { prefix: '/api/users' });
 await app.register(adminRoutes, { prefix: '/api/admin' });

@@ -1,13 +1,17 @@
-// appfolder/controller/adminController.js
+// controllers/adminController.js
 import User from '../models/userModel.js';
+import { ValidationError, NotFoundError, ConflictError } from '../utils/errors.js';
+import mongoose from 'mongoose';
 
 /**
  * Admin: get all users (optionally filter role)
  */
 export const getAllUsers = async (req, reply) => {
-  const { role } = req.query; // optional: ?role=user
+  // ✅ NO try-catch
+  const { role } = req.query;
   const filter = {};
   if (role) filter.role = role;
+  
   const users = await User.find(filter).select('-password');
   return reply.send(users);
 };
@@ -16,13 +20,18 @@ export const getAllUsers = async (req, reply) => {
  * Admin: edit a user (name, email, role, active)
  */
 export const editUser = async (req, reply) => {
+  // ✅ NO try-catch
   const { id } = req.params;
   const { name, email, role, active } = req.body;
 
-  // Prevent demoting the last superadmin accidentally - simple check: you can add more complex protections if required.
+  // Validate ID
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ValidationError('Invalid user ID', { id });
+  }
+
   const target = await User.findById(id);
   if (!target) {
-    return reply.status(404).send({ message: 'User not found' });
+    throw new NotFoundError('User', { id });
   }
 
   // Only allow allowed fields
@@ -32,6 +41,7 @@ export const editUser = async (req, reply) => {
   if (active !== undefined) target.active = active;
 
   await target.save();
+  
   return reply.send({ 
     message: 'User updated', 
     user: { 
@@ -48,13 +58,26 @@ export const editUser = async (req, reply) => {
  * Admin: delete a user (permanent)
  */
 export const deleteUser = async (req, reply) => {
+  // ✅ NO try-catch
   const { id } = req.params;
+
+  // Validate ID
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ValidationError('Invalid user ID', { id });
+  }
+
   const user = await User.findById(id);
   if (!user) {
-    return reply.status(404).send({ message: 'User not found' });
+    throw new NotFoundError('User', { id });
+  }
+
+  // Prevent deleting yourself? (optional)
+  if (user._id.toString() === req.user.userId) {
+    throw new ConflictError('Cannot delete your own account');
   }
 
   await User.deleteOne({ _id: id });
+  
   return reply.send({ message: 'User permanently deleted' });
 };
 
@@ -62,13 +85,26 @@ export const deleteUser = async (req, reply) => {
  * Admin: deactivate a user (soft-delete)
  */
 export const deactivateUser = async (req, reply) => {
+  // ✅ NO try-catch
   const { id } = req.params;
+
+  // Validate ID
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ValidationError('Invalid user ID', { id });
+  }
+
   const user = await User.findById(id);
   if (!user) {
-    return reply.status(404).send({ message: 'User not found' });
+    throw new NotFoundError('User', { id });
+  }
+
+  // Prevent deactivating yourself? (optional)
+  if (user._id.toString() === req.user.userId) {
+    throw new ConflictError('Cannot deactivate your own account');
   }
 
   user.active = false;
   await user.save();
+  
   return reply.send({ message: 'User deactivated' });
 };

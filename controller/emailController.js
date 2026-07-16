@@ -1,6 +1,12 @@
+// controllers/emailController.js
 import nodemailer from 'nodemailer';
 import Order from '../models/orderModel.js';
 import User from '../models/userModel.js';
+import {
+  ValidationError,
+  NotFoundError,
+  DatabaseError
+} from '../utils/errors.js';
 
 // Create transporter (configure with your email service)
 const createTransporter = () => {
@@ -370,7 +376,7 @@ export const emailTemplates = {
     };
   },
 
-  // ORDER CANCELLATION NOTIFICATION TEMPLATE (NEW)
+  // ORDER CANCELLATION NOTIFICATION TEMPLATE
   orderCancellationNotification: (order, cancelledBy = 'user', cancellationReason = 'Not specified') => {
     // Safe customer info extraction
     const customerInfo = order.isGuestOrder 
@@ -601,7 +607,7 @@ export const emailTemplates = {
     };
   },
 
-  // ✅ ADDED: GUEST PASSWORD EMAIL TEMPLATE (THIS WAS MISSING!)
+  // GUEST PASSWORD EMAIL TEMPLATE
   guestPasswordEmail: (email, password, order) => {
     const orderId = order.orderId || 'N/A';
     const userName = order.guestUser?.name || 
@@ -931,10 +937,7 @@ export const sendOrderStatusUpdate = async (req, reply) => {
     }
 
     if (!order) {
-      return reply.status(404).send({
-        success: false,
-        message: 'Order not found',
-      });
+      throw new NotFoundError('Order', { orderId });
     }
 
     const oldStatus = order.orderStatus;
@@ -953,11 +956,11 @@ export const sendOrderStatusUpdate = async (req, reply) => {
     try {
       // This should call the email template, not recursively call this function
       const emailTemplate = emailTemplates.orderStatusUpdate(order, oldStatus, orderStatus);
-      await sendEmail(
-        order.isGuestOrder ? order.guestUser?.email : order.user?.email,
-        emailTemplate.subject,
-        emailTemplate.html
-      );
+      const userEmail = order.isGuestOrder ? order.guestUser?.email : order.user?.email;
+      
+      if (userEmail) {
+        await sendEmail(userEmail, emailTemplate.subject, emailTemplate.html);
+      }
     } catch (emailError) {
       console.error('Order status update email failed:', emailError);
     }
@@ -973,9 +976,9 @@ export const sendOrderStatusUpdate = async (req, reply) => {
     });
   } catch (error) {
     console.error('Update order status error:', error);
-    reply.status(500).send({
-      success: false,
-      message: error.message,
+    if (error instanceof NotFoundError) throw error;
+    throw new DatabaseError('Failed to update order status', {
+      error: error.message
     });
   }
 };
@@ -1033,7 +1036,7 @@ export const sendBulkAdminNotification = async (orders) => {
   }
 };
 
-// Send order cancellation notification to admin (NEW FUNCTION)
+// Send order cancellation notification to admin
 export const sendOrderCancellationNotification = async (order, cancelledBy = 'user', cancellationReason = 'Not specified') => {
   try {
     console.log('🚨 Sending order cancellation notification for order:', order.orderId);
@@ -1078,7 +1081,7 @@ export const sendOrderCancellationNotification = async (order, cancelledBy = 'us
   }
 };
 
-// Send guest password email (NEW FUNCTION)
+// Send guest password email
 export const sendGuestPasswordEmail = async (email, password, order) => {
   try {
     console.log('🔐 Sending guest password email to:', email);
@@ -1145,9 +1148,7 @@ export const testEmail = async (req, reply) => {
     });
   } catch (error) {
     console.error('Test email failed:', error);
-    reply.status(500).send({
-      success: false,
-      message: 'Test email failed',
+    throw new DatabaseError('Test email failed', {
       error: error.message
     });
   }
